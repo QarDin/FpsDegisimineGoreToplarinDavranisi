@@ -1,0 +1,1060 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Değişken ve sabit fizik adımlarını karşılaştıran etkileşimli FPS demosu.">
+  <title>Düşük FPS Fiziği Neden Bozar?</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --zemin: #04060A;
+      --yazi: #FFFFFF;
+      --mavi: #1F6FB5;
+      --lacivert: #062A4D;
+      --kirmizi: #DC2626;
+      --yesil: #22A05B;
+      --gri: #7A8894;
+      --kenar: rgba(122, 136, 148, 0.38);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: var(--zemin);
+    }
+
+    body {
+      color: rgba(255, 255, 255, 0.85);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.45;
+    }
+
+    button, input { font: inherit; }
+
+    main {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 32px 0 40px;
+    }
+
+    header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 22px;
+    }
+
+    h1 {
+      max-width: 720px;
+      margin: 0 0 8px;
+      color: var(--yazi);
+      font-size: clamp(1.8rem, 4vw, 3.2rem);
+      line-height: 1.05;
+      letter-spacing: -0.04em;
+    }
+
+    .aciklama {
+      max-width: 760px;
+      margin: 0;
+      color: rgba(255, 255, 255, 0.68);
+      font-size: clamp(0.94rem, 1.5vw, 1.05rem);
+    }
+
+    .durum {
+      flex: 0 0 auto;
+      border: 1px solid var(--kenar);
+      padding: 7px 10px;
+      color: var(--gri);
+      font-size: 0.78rem;
+      font-weight: 750;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .durum.calısıyor {
+      border-color: var(--yesil);
+      color: var(--yesil);
+    }
+
+    .kontroller {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) auto;
+      gap: 18px;
+      align-items: end;
+      margin-bottom: 18px;
+      border: 1px solid var(--kenar);
+      background: rgba(6, 42, 77, 0.38);
+      padding: 18px;
+    }
+
+    .kontrol { min-width: 0; }
+
+    .kontrol-etiketi {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 9px;
+      color: var(--yazi);
+      font-size: 0.92rem;
+      font-weight: 680;
+    }
+
+    output {
+      color: var(--mavi);
+      font-variant-numeric: tabular-nums;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      height: 22px;
+      margin: 0;
+      accent-color: var(--mavi);
+      cursor: pointer;
+    }
+
+    .dugmeler {
+      display: flex;
+      gap: 10px;
+    }
+
+    button {
+      min-height: 42px;
+      border: 1px solid var(--gri);
+      border-radius: 0;
+      background: transparent;
+      color: var(--yazi);
+      padding: 0 17px;
+      font-weight: 720;
+      cursor: pointer;
+    }
+
+    button:hover, button:focus-visible {
+      border-color: var(--mavi);
+      background: var(--lacivert);
+      outline: none;
+    }
+
+    button.ana {
+      border-color: var(--mavi);
+      background: var(--mavi);
+    }
+
+    button.ana:hover, button.ana:focus-visible {
+      background: var(--lacivert);
+    }
+
+    .sahne {
+      position: relative;
+      min-height: 390px;
+      border: 1px solid var(--kenar);
+      overflow: hidden;
+      background: var(--zemin);
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 390px;
+    }
+
+    .sahne-etiketleri {
+      position: absolute;
+      inset: 14px 16px auto;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      pointer-events: none;
+    }
+
+    .sahne-etiketi {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 6px 10px;
+      padding-right: 12px;
+      color: var(--yazi);
+      font-weight: 760;
+    }
+
+    .sahne-etiketi:last-child { padding-left: 18px; }
+
+    .sahne-etiketi small {
+      color: var(--gri);
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .paneller {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-top: 14px;
+    }
+
+    .panel {
+      border: 1px solid var(--kenar);
+      background: rgba(6, 42, 77, 0.48);
+      padding: 16px;
+    }
+
+    .panel h2 {
+      margin: 0 0 13px;
+      color: var(--yazi);
+      font-size: 1rem;
+    }
+
+    .panel.sabit h2 { color: #72B8F0; }
+
+    .veriler {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin: 0;
+    }
+
+    .sabit .veriler { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+
+    .veri { min-width: 0; }
+
+    dt {
+      margin-bottom: 3px;
+      color: var(--gri);
+      font-size: 0.69rem;
+      font-weight: 720;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    dd {
+      margin: 0;
+      overflow: hidden;
+      color: var(--yazi);
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: clamp(0.75rem, 1.45vw, 0.9rem);
+      font-variant-numeric: tabular-nums;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .dipnot {
+      margin: 13px 2px 0;
+      color: var(--gri);
+      font-size: 0.8rem;
+    }
+
+    .atis-demo {
+      margin-top: 70px;
+      padding-top: 34px;
+      border-top: 1px solid var(--gri);
+    }
+
+    .atis-baslik {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 20px;
+    }
+
+    .atis-baslik h2 {
+      max-width: 760px;
+      margin: 0 0 8px;
+      color: var(--yazi);
+      font-size: clamp(1.7rem, 4vw, 3rem);
+      line-height: 1.05;
+      letter-spacing: -0.04em;
+    }
+
+    .atis-baslik p {
+      max-width: 800px;
+      margin: 0;
+      color: rgba(255, 255, 255, 0.68);
+    }
+
+    .atis-rozet {
+      flex: 0 0 auto;
+      border: 1px dashed var(--gri);
+      padding: 7px 10px;
+      color: var(--gri);
+      font-size: 0.75rem;
+      font-weight: 750;
+      text-transform: uppercase;
+    }
+
+    .atis-kontroller {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(120px, 1fr)) auto;
+      gap: 15px;
+      align-items: end;
+      border: 1px solid var(--kenar);
+      background: rgba(6, 42, 77, 0.38);
+      padding: 16px;
+    }
+
+    .atis-fpsler {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-top: 12px;
+      border: 1px solid var(--kenar);
+      padding: 12px 16px;
+    }
+
+    .atis-fps {
+      display: grid;
+      grid-template-columns: auto minmax(0, 84px);
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-width: 0;
+      font-size: 0.78rem;
+      font-weight: 750;
+    }
+
+    .atis-fps:nth-child(1) { color: var(--kirmizi); }
+    .atis-fps:nth-child(2) { color: #E08A2E; }
+    .atis-fps:nth-child(3) { color: #72B8F0; }
+    .atis-fps:nth-child(4) { color: var(--yesil); }
+
+    .atis-fps input {
+      width: 100%;
+      min-width: 0;
+      border: 1px solid currentColor;
+      border-radius: 0;
+      background: var(--zemin);
+      color: var(--yazi);
+      padding: 7px 8px;
+      text-align: center;
+      font-weight: 700;
+    }
+
+    .atis-tablo {
+      margin-top: 14px;
+      border: 1px solid var(--kenar);
+      overflow: hidden;
+    }
+
+    .atis-tablo table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .atis-tablo th, .atis-tablo td {
+      border-right: 1px solid var(--kenar);
+      padding: 9px 12px;
+      text-align: left;
+    }
+
+    .atis-tablo th:last-child, .atis-tablo td:last-child { border-right: 0; }
+
+    .atis-tablo th {
+      background: rgba(6, 42, 77, 0.48);
+      color: var(--gri);
+      font-size: 0.7rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .atis-tablo td {
+      color: var(--yazi);
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+
+    .atis-tablo td:nth-child(1) { color: var(--kirmizi); }
+    .atis-tablo td:nth-child(2) { color: #E08A2E; }
+    .atis-tablo td:nth-child(3) { color: #72B8F0; }
+    .atis-tablo td:nth-child(4) { color: var(--yesil); }
+
+    .atis-sahne {
+      position: relative;
+      height: 460px;
+      margin-top: 14px;
+      border: 1px solid var(--kenar);
+      overflow: hidden;
+    }
+
+    .atis-sahne canvas { width: 100%; height: 100%; }
+
+    .atis-gercek {
+      margin-top: 14px;
+      border-left: 3px solid var(--gri);
+      padding: 10px 12px;
+      color: var(--gri);
+      font-size: 0.82rem;
+    }
+
+    .atis-gercek strong { color: var(--yazi); }
+
+    @media (max-width: 760px) {
+      main { width: min(100% - 20px, 620px); padding-top: 22px; }
+      header { align-items: flex-start; flex-direction: column; gap: 12px; }
+      .kontroller { grid-template-columns: 1fr; gap: 15px; }
+      .dugmeler { display: grid; grid-template-columns: 1fr 1fr; }
+      .paneller { grid-template-columns: 1fr; }
+      .veriler, .sabit .veriler { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .sahne { min-height: 340px; }
+      canvas { height: 340px; }
+      .sahne-etiketleri { inset-inline: 10px; }
+      .sahne-etiketi { align-content: flex-start; flex-direction: column; gap: 1px; font-size: 0.83rem; }
+      .sahne-etiketi:last-child { padding-left: 12px; }
+      .sahne-etiketi small { font-size: 0.64rem; }
+      .atis-demo { margin-top: 52px; }
+      .atis-baslik { align-items: flex-start; flex-direction: column; gap: 12px; }
+      .atis-kontroller { grid-template-columns: 1fr; }
+      .atis-fpsler { grid-template-columns: 1fr 1fr; }
+      .atis-fps { grid-template-columns: auto minmax(0, 1fr); }
+      .atis-sahne { height: 390px; }
+      .atis-tablo th, .atis-tablo td { padding: 8px 4px; text-align: center; }
+      .atis-tablo th { font-size: 0.6rem; }
+      .atis-tablo td { font-size: 0.67rem; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>Düşük FPS fiziği neden bozar?</h1>
+        <p class="aciklama">Soldaki top değişken <code>dt</code> kullanır; sağdaki top ise FPS ne olursa olsun fiziği sabit 16 milisaniyelik adımlarla hesaplar.</p>
+      </div>
+      <div id="durum" class="durum calısıyor" aria-live="polite">Simülasyon çalışıyor</div>
+    </header>
+
+    <section class="kontroller" aria-label="Simülasyon kontrolleri">
+      <label class="kontrol" for="fps">
+        <span class="kontrol-etiketi"><span>FPS</span><output id="fpsDegeri" for="fps">60</output></span>
+        <input id="fps" type="range" min="5" max="240" value="60" step="1">
+      </label>
+
+      <label class="kontrol" for="yay">
+        <span class="kontrol-etiketi"><span>Yay katsayısı (k)</span><output id="yayDegeri" for="yay">100</output></span>
+        <input id="yay" type="range" min="1" max="800" value="100" step="1">
+      </label>
+
+      <div class="dugmeler">
+        <button id="sifirla" type="button">Sıfırla</button>
+        <button id="duraklat" class="ana" type="button">Duraklat</button>
+      </div>
+    </section>
+
+    <section class="sahne" aria-label="Yay simülasyonu karşılaştırması">
+      <canvas id="tuval"></canvas>
+      <div class="sahne-etiketleri" aria-hidden="true">
+        <div class="sahne-etiketi">Değişken adım <small>dt = 1 / FPS</small></div>
+        <div class="sahne-etiketi">Sabit adım + biriktirici <small>adım = 16 ms</small></div>
+      </div>
+    </section>
+
+    <section class="paneller" aria-label="Canlı fizik değerleri">
+      <article class="panel">
+        <h2>Sol top — değişken adım</h2>
+        <dl class="veriler">
+          <div class="veri"><dt>dt</dt><dd id="solDt">0.0167 s</dd></div>
+          <div class="veri"><dt>Kuvvet</dt><dd id="solKuvvet">100.000</dd></div>
+          <div class="veri"><dt>Hız</dt><dd id="solHiz">0.000</dd></div>
+          <div class="veri"><dt>Konum</dt><dd id="solKonum">-1.000</dd></div>
+        </dl>
+      </article>
+
+      <article class="panel sabit">
+        <h2>Sağ top — sabit adım</h2>
+        <dl class="veriler">
+          <div class="veri"><dt>dt</dt><dd id="sagDt">0.0083 s</dd></div>
+          <div class="veri"><dt>Kuvvet</dt><dd id="sagKuvvet">100.000</dd></div>
+          <div class="veri"><dt>Hız</dt><dd id="sagHiz">0.000</dd></div>
+          <div class="veri"><dt>Konum</dt><dd id="sagKonum">-1.000</dd></div>
+          <div class="veri"><dt>Biriken zaman</dt><dd id="biriken">0.0000 s</dd></div>
+        </dl>
+      </article>
+    </section>
+
+    <p class="dipnot">İnce gri çizgi kesin matematiksel çözümü gösterir: konum(t) = A × cos(√k × t). Düşük FPS ve yüksek k ile farkı büyütebilirsin.</p>
+
+    <section id="atis-demo" class="atis-demo" aria-labelledby="atis-basligi">
+      <div class="atis-baslik">
+        <div>
+          <h2 id="atis-basligi">Dört top, dört farklı FPS</h2>
+          <p>Aynı hız, açı ve yerçekimi; yalnızca fizik hesaplarının zaman adımı farklı. Düşük FPS, topu yere erken indirir.</p>
+        </div>
+        <div class="atis-rozet">Kesik çizgi: gerçek cevap</div>
+      </div>
+
+      <div class="atis-kontroller" aria-label="Atış kontrolleri">
+        <label class="kontrol" for="atisHiz">
+          <span class="kontrol-etiketi"><span>Fırlatma hızı</span><output id="atisHizDegeri">28,3 m/s</output></span>
+          <input id="atisHiz" type="range" min="10" max="50" value="28.284" step="0.1">
+        </label>
+        <label class="kontrol" for="atisAci">
+          <span class="kontrol-etiketi"><span>Açı</span><output id="atisAciDegeri">45°</output></span>
+          <input id="atisAci" type="range" min="15" max="75" value="45" step="1">
+        </label>
+        <label class="kontrol" for="atisG">
+          <span class="kontrol-etiketi"><span>Yerçekimi</span><output id="atisGDegeri">9,81 m/s²</output></span>
+          <input id="atisG" type="range" min="1" max="20" value="9.81" step="0.01">
+        </label>
+        <label class="kontrol" for="atisYavas">
+          <span class="kontrol-etiketi"><span>Yavaşlatma</span><output id="atisYavasDegeri">1,0×</output></span>
+          <input id="atisYavas" type="range" min="0.1" max="1" value="1" step="0.1">
+        </label>
+        <button id="atisYeniden" class="ana" type="button">Yeniden fırlat</button>
+      </div>
+
+      <div class="atis-fpsler" aria-label="Topların FPS değerleri">
+        <label class="atis-fps">1. top <input type="number" min="1" max="240" value="5" inputmode="numeric" aria-label="Birinci top FPS"></label>
+        <label class="atis-fps">2. top <input type="number" min="1" max="240" value="10" inputmode="numeric" aria-label="İkinci top FPS"></label>
+        <label class="atis-fps">3. top <input type="number" min="1" max="240" value="20" inputmode="numeric" aria-label="Üçüncü top FPS"></label>
+        <label class="atis-fps">4. top <input type="number" min="1" max="240" value="60" inputmode="numeric" aria-label="Dördüncü top FPS"></label>
+      </div>
+
+      <div class="atis-tablo" aria-label="Menzil ve sapma tablosu">
+        <table>
+          <thead><tr><th>5 FPS</th><th>10 FPS</th><th>20 FPS</th><th>60 FPS</th></tr></thead>
+          <tbody><tr><td>Menzil — · Sapma —</td><td>Menzil — · Sapma —</td><td>Menzil — · Sapma —</td><td>Menzil — · Sapma —</td></tr></tbody>
+        </table>
+      </div>
+
+      <div class="atis-sahne">
+        <canvas id="atisTuval" aria-label="Dört farklı FPS ile hesaplanan eğik atış yörüngeleri"></canvas>
+      </div>
+      <p class="atis-gercek"><strong>Gerçek cevap:</strong> <span id="atisGercekCevap">Hesaplanıyor…</span></p>
+    </section>
+  </main>
+
+  <script>
+    "use strict";
+
+    // Sabit fizik adımı uygulama boyunca değişmez.
+    const SABIT_ADIM = 0.016;
+    const GENLIK = -1;
+    const DENGE = 0;
+    const IZ_UZUNLUGU = 150;
+
+    const tuval = document.querySelector("#tuval");
+    const cizim = tuval.getContext("2d");
+    const fpsGirdisi = document.querySelector("#fps");
+    const yayGirdisi = document.querySelector("#yay");
+    const fpsDegeri = document.querySelector("#fpsDegeri");
+    const yayDegeri = document.querySelector("#yayDegeri");
+    const duraklatDugmesi = document.querySelector("#duraklat");
+    const sifirlaDugmesi = document.querySelector("#sifirla");
+    const durum = document.querySelector("#durum");
+
+    const alanlar = {
+      solDt: document.querySelector("#solDt"),
+      solKuvvet: document.querySelector("#solKuvvet"),
+      solHiz: document.querySelector("#solHiz"),
+      solKonum: document.querySelector("#solKonum"),
+      sagDt: document.querySelector("#sagDt"),
+      sagKuvvet: document.querySelector("#sagKuvvet"),
+      sagHiz: document.querySelector("#sagHiz"),
+      sagKonum: document.querySelector("#sagKonum"),
+      biriken: document.querySelector("#biriken")
+    };
+
+    let sol;
+    let sag;
+    let simülasyonZamani;
+    let kareBiriktirici;
+    let duraklatildi = false;
+    let oncekiGercekZaman = performance.now();
+
+    function yeniTop() {
+      return { konum: GENLIK, hiz: 0, kuvvet: 0, iz: [], patladi: false };
+    }
+
+    function sifirla() {
+      sol = yeniTop();
+      sag = yeniTop();
+      const ilkKuvvet = Number(yayGirdisi.value) * (DENGE - GENLIK);
+      sol.kuvvet = ilkKuvvet;
+      sag.kuvvet = ilkKuvvet;
+      sag.biriken = 0;
+      simülasyonZamani = 0;
+      kareBiriktirici = 0;
+      oncekiGercekZaman = performance.now();
+      degerleriYaz();
+    }
+
+    // Yarı örtük Euler: önce hız, sonra yeni hızla konum hesaplanır.
+    function fizikAdimi(top, dt, k) {
+      top.kuvvet = k * (DENGE - top.konum);
+      top.hiz += top.kuvvet * dt;
+      top.konum += top.hiz * dt;
+
+      if (!Number.isFinite(top.konum) || !Number.isFinite(top.hiz)) {
+        top.patladi = true;
+      }
+    }
+
+    function simülasyonuIlerlet(dt, k) {
+      // Sol top seçilen FPS'in büyük veya küçük dt değerini doğrudan kullanır.
+      if (!sol.patladi) fizikAdimi(sol, dt, k);
+
+      // Sağ top aynı süreyi değişmeyen küçük parçalara böler.
+      sag.biriken += dt;
+      while (sag.biriken + Number.EPSILON >= SABIT_ADIM) {
+        fizikAdimi(sag, SABIT_ADIM, k);
+        sag.biriken -= SABIT_ADIM;
+      }
+
+      simülasyonZamani += dt;
+      izEkle(sol);
+      izEkle(sag);
+    }
+
+    function izEkle(top) {
+      if (!top.patladi && Number.isFinite(top.konum)) {
+        top.iz.push(top.konum);
+        if (top.iz.length > IZ_UZUNLUGU) top.iz.shift();
+      }
+    }
+
+    function boyutlandir() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const dikdortgen = tuval.getBoundingClientRect();
+      const genislik = Math.round(dikdortgen.width * dpr);
+      const yukseklik = Math.round(dikdortgen.height * dpr);
+
+      if (tuval.width !== genislik || tuval.height !== yukseklik) {
+        tuval.width = genislik;
+        tuval.height = yukseklik;
+      }
+
+      cizim.setTransform(dpr, 0, 0, dpr, 0, 0);
+      return { genislik: dikdortgen.width, yukseklik: dikdortgen.height };
+    }
+
+    function konumuYap(topKonumu, yukseklik) {
+      const merkez = yukseklik * 0.57;
+      const olcek = Math.min(105, yukseklik * 0.26);
+      // Aşırı büyüyen sayılar çizim API'sine verilmeden görünür alanla sınırlandırılır.
+      return merkez + Math.max(-3, Math.min(3, topKonumu)) * olcek;
+    }
+
+    function referansCizgisi(x0, x1, y) {
+      cizim.save();
+      cizim.strokeStyle = "rgba(122, 136, 148, 0.72)";
+      cizim.lineWidth = 1;
+      cizim.setLineDash([5, 6]);
+      cizim.beginPath();
+      cizim.moveTo(x0, y + 0.5);
+      cizim.lineTo(x1, y + 0.5);
+      cizim.stroke();
+      cizim.restore();
+    }
+
+    function iziCiz(top, merkezX, yukseklik, renk) {
+      if (top.iz.length < 2) return;
+      const adimX = Math.min(2.2, (tuval.clientWidth * 0.38) / IZ_UZUNLUGU);
+
+      for (let i = 1; i < top.iz.length; i++) {
+        const oran = i / top.iz.length;
+        cizim.strokeStyle = renk.replace("OPAKLIK", String(oran * 0.52));
+        cizim.lineWidth = 2 + oran * 4;
+        cizim.beginPath();
+        cizim.moveTo(merkezX - (top.iz.length - i + 1) * adimX, konumuYap(top.iz[i - 1], yukseklik));
+        cizim.lineTo(merkezX - (top.iz.length - i) * adimX, konumuYap(top.iz[i], yukseklik));
+        cizim.stroke();
+      }
+    }
+
+    function topuCiz(top, merkezX, yukseklik, renk) {
+      if (top.patladi) {
+        cizim.fillStyle = "#DC2626";
+        cizim.font = "800 54px system-ui, sans-serif";
+        cizim.textAlign = "center";
+        cizim.textBaseline = "middle";
+        cizim.fillText("NaN", merkezX, yukseklik * 0.57);
+        return;
+      }
+
+      const y = konumuYap(top.konum, yukseklik);
+      cizim.fillStyle = renk;
+      cizim.beginPath();
+      cizim.arc(merkezX, y, 18, 0, Math.PI * 2);
+      cizim.fill();
+    }
+
+    function ciz() {
+      const { genislik, yukseklik } = boyutlandir();
+      cizim.clearRect(0, 0, genislik, yukseklik);
+
+      const orta = genislik / 2;
+      const solX = genislik * 0.27;
+      const sagX = genislik * 0.73;
+      const k = Number(yayGirdisi.value);
+      const kesinKonum = GENLIK * Math.cos(Math.sqrt(k) * simülasyonZamani);
+      const referansY = konumuYap(kesinKonum, yukseklik);
+
+      cizim.strokeStyle = "rgba(122, 136, 148, 0.30)";
+      cizim.lineWidth = 1;
+      cizim.beginPath();
+      cizim.moveTo(orta + 0.5, 0);
+      cizim.lineTo(orta + 0.5, yukseklik);
+      cizim.stroke();
+
+      referansCizgisi(18, orta - 18, referansY);
+      referansCizgisi(orta + 18, genislik - 18, referansY);
+
+      const solSapma = Number.isFinite(sol.konum) ? Math.abs(sol.konum - kesinKonum) : Infinity;
+      const solRenk = solSapma > 0.35 || Math.abs(sol.konum) > 1.5 ? "#DC2626" : "#7A8894";
+
+      iziCiz(sol, solX, yukseklik, solRenk === "#DC2626" ? "rgba(220, 38, 38, OPAKLIK)" : "rgba(122, 136, 148, OPAKLIK)");
+      iziCiz(sag, sagX, yukseklik, "rgba(31, 111, 181, OPAKLIK)");
+      topuCiz(sol, solX, yukseklik, solRenk);
+      topuCiz(sag, sagX, yukseklik, "#1F6FB5");
+    }
+
+    function sayiyiYaz(sayi, basamak = 3) {
+      if (!Number.isFinite(sayi)) return "NaN";
+      if (Math.abs(sayi) >= 100000) return sayi.toExponential(2);
+      return sayi.toFixed(basamak);
+    }
+
+    function degerleriYaz() {
+      const seciliDt = 1 / Number(fpsGirdisi.value);
+      alanlar.solDt.textContent = `${seciliDt.toFixed(4)} s`;
+      alanlar.solKuvvet.textContent = sayiyiYaz(sol.kuvvet);
+      alanlar.solHiz.textContent = sayiyiYaz(sol.hiz);
+      alanlar.solKonum.textContent = sayiyiYaz(sol.konum);
+      alanlar.sagDt.textContent = `${SABIT_ADIM.toFixed(4)} s`;
+      alanlar.sagKuvvet.textContent = sayiyiYaz(sag.kuvvet);
+      alanlar.sagHiz.textContent = sayiyiYaz(sag.hiz);
+      alanlar.sagKonum.textContent = sayiyiYaz(sag.konum);
+      alanlar.biriken.textContent = `${Math.max(0, sag.biriken).toFixed(4)} s`;
+    }
+
+    function animasyon(gercekZaman) {
+      const gercekDt = Math.min((gercekZaman - oncekiGercekZaman) / 1000, 0.1);
+      oncekiGercekZaman = gercekZaman;
+
+      if (!duraklatildi) {
+        const simDt = 1 / Number(fpsGirdisi.value);
+        const k = Number(yayGirdisi.value);
+        kareBiriktirici += gercekDt;
+
+        // Render akıcı kalır; fizik yalnızca seçilen FPS sıklığında güncellenir.
+        while (kareBiriktirici + Number.EPSILON >= simDt) {
+          simülasyonuIlerlet(simDt, k);
+          kareBiriktirici -= simDt;
+        }
+      }
+
+      degerleriYaz();
+      ciz();
+      requestAnimationFrame(animasyon);
+    }
+
+    fpsGirdisi.addEventListener("input", () => {
+      fpsDegeri.value = fpsGirdisi.value;
+      // Önceki FPS'ten kalan süre yeni adımın altında tutulur.
+      kareBiriktirici = Math.min(kareBiriktirici, 1 / Number(fpsGirdisi.value));
+    });
+
+    yayGirdisi.addEventListener("input", () => {
+      yayDegeri.value = yayGirdisi.value;
+      // Kesin çözüm yeni k değeriyle t=0'dan başlasın; karşılaştırma böylece adil kalır.
+      sifirla();
+    });
+
+    sifirlaDugmesi.addEventListener("click", sifirla);
+
+    duraklatDugmesi.addEventListener("click", () => {
+      duraklatildi = !duraklatildi;
+      duraklatDugmesi.textContent = duraklatildi ? "Devam" : "Duraklat";
+      durum.textContent = duraklatildi ? "Simülasyon duraklatıldı" : "Simülasyon çalışıyor";
+      durum.classList.toggle("calısıyor", !duraklatildi);
+      oncekiGercekZaman = performance.now();
+    });
+
+    window.addEventListener("resize", ciz);
+
+    sifirla();
+    requestAnimationFrame(animasyon);
+  </script>
+  <script>
+    "use strict";
+
+    (() => {
+      const KOK = document.querySelector("#atis-demo");
+      const RENKLER = ["#DC2626", "#E08A2E", "#1F6FB5", "#22A05B"];
+      const tuval = KOK.querySelector("#atisTuval");
+      const cizim = tuval.getContext("2d");
+      const hizGirdisi = KOK.querySelector("#atisHiz");
+      const aciGirdisi = KOK.querySelector("#atisAci");
+      const gGirdisi = KOK.querySelector("#atisG");
+      const yavasGirdisi = KOK.querySelector("#atisYavas");
+      const fpsGirdileri = [...KOK.querySelectorAll(".atis-fps input")];
+      const basliklar = [...KOK.querySelectorAll(".atis-tablo th")];
+      const sonuclar = [...KOK.querySelectorAll(".atis-tablo td")];
+
+      let toplar = [];
+      let bilgi;
+      let oncekiGercekZaman = performance.now();
+
+      function sayi(deger, basamak = 2) {
+        return deger.toLocaleString("tr-TR", {
+          minimumFractionDigits: basamak,
+          maximumFractionDigits: basamak
+        });
+      }
+
+      function atisBilgisiniOku() {
+        const hiz = Number(hizGirdisi.value);
+        const aci = Number(aciGirdisi.value) * Math.PI / 180;
+        const g = Number(gGirdisi.value);
+        const hizX = hiz * Math.cos(aci);
+        const hizY = hiz * Math.sin(aci);
+        const ucusSuresi = 2 * hizY / g;
+        return {
+          g, hizX, hizY, ucusSuresi,
+          menzil: hizX * ucusSuresi,
+          tepe: hizY * hizY / (2 * g)
+        };
+      }
+
+      function fpsOku(girdi) {
+        const ham = Number(girdi.value);
+        const fps = Math.max(1, Math.min(240, Number.isFinite(ham) ? Math.round(ham) : 1));
+        girdi.value = fps;
+        return fps;
+      }
+
+      function yeniTop(fps, renk) {
+        return {
+          fps, renk, dt: 1 / fps,
+          x: 0, y: 0, oncekiX: 0, oncekiY: 0,
+          hizX: bilgi.hizX, hizY: bilgi.hizY,
+          biriken: 0, indi: false, menzil: null,
+          iz: [{ x: 0, y: 0 }]
+        };
+      }
+
+      function yenidenFirlat() {
+        bilgi = atisBilgisiniOku();
+        toplar = fpsGirdileri.map((girdi, i) => yeniTop(fpsOku(girdi), RENKLER[i]));
+        oncekiGercekZaman = performance.now();
+        arayuzuGuncelle();
+      }
+
+      // Dört top da aynı yarı örtük Euler hesabını yapar; yalnız dt değerleri ayrıdır.
+      function fizikAdimi(top) {
+        const eskiX = top.x;
+        const eskiY = top.y;
+        top.oncekiX = top.x;
+        top.oncekiY = top.y;
+        top.hizY += -bilgi.g * top.dt;
+        top.x += top.hizX * top.dt;
+        top.y += top.hizY * top.dt;
+
+        if (top.y <= 0 && top.iz.length > 1) {
+          // Zemin kesişimini son iki örnek arasında bulup menzil işaretini y=0'a koyarız.
+          const oran = eskiY / (eskiY - top.y);
+          top.menzil = eskiX + (top.x - eskiX) * oran;
+          top.x = top.menzil;
+          top.y = 0;
+          top.indi = true;
+        }
+        top.iz.push({ x: top.x, y: Math.max(0, top.y) });
+      }
+
+      function fizigiIlerlet(gercekDt) {
+        const yavaslatma = Number(yavasGirdisi.value);
+        for (const top of toplar) {
+          if (top.indi) continue;
+          top.biriken += gercekDt * yavaslatma;
+          // Gerçek render akıcı kalırken biriken zaman topun kendi dt parçalarıyla tüketilir.
+          while (top.biriken + Number.EPSILON >= top.dt && !top.indi) {
+            fizikAdimi(top);
+            top.biriken -= top.dt;
+          }
+        }
+      }
+
+      function boyutlandir() {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const kutu = tuval.getBoundingClientRect();
+        const genislik = Math.round(kutu.width * dpr);
+        const yukseklik = Math.round(kutu.height * dpr);
+        if (tuval.width !== genislik || tuval.height !== yukseklik) {
+          tuval.width = genislik;
+          tuval.height = yukseklik;
+        }
+        cizim.setTransform(dpr, 0, 0, dpr, 0, 0);
+        return { genislik: kutu.width, yukseklik: kutu.height };
+      }
+
+      function donusum(genislik, yukseklik) {
+        const sol = genislik < 600 ? 34 : 54;
+        const sag = 25;
+        const zemin = yukseklik - 58;
+        const xAzami = Math.max(10, bilgi.menzil * 1.12);
+        const yAzami = Math.max(4, bilgi.tepe * 1.22);
+        const xOlcek = (genislik - sol - sag) / xAzami;
+        const yOlcek = (zemin - 48) / yAzami;
+        return {
+          sol, sag, zemin, xAzami,
+          x: metre => sol + metre * xOlcek,
+          y: metre => zemin - metre * yOlcek
+        };
+      }
+
+      function eksenleriCiz(d, genislik) {
+        cizim.strokeStyle = "#7A8894";
+        cizim.fillStyle = "#7A8894";
+        cizim.lineWidth = 1;
+        cizim.font = "11px system-ui, sans-serif";
+        cizim.textAlign = "center";
+        cizim.textBaseline = "top";
+        cizim.beginPath();
+        cizim.moveTo(d.sol, d.zemin + 0.5);
+        cizim.lineTo(genislik - d.sag, d.zemin + 0.5);
+        cizim.stroke();
+
+        const aralik = d.xAzami > 100 ? 20 : (genislik < 600 ? 5 : 10);
+        for (let metre = 0; metre <= d.xAzami; metre += aralik) {
+          const x = d.x(metre);
+          cizim.beginPath();
+          cizim.moveTo(x, d.zemin);
+          cizim.lineTo(x, d.zemin + 6);
+          cizim.stroke();
+          cizim.fillText(`${metre} m`, x, d.zemin + 10);
+        }
+      }
+
+      function referansiCiz(d) {
+        cizim.save();
+        cizim.strokeStyle = "rgba(122, 136, 148, 0.85)";
+        cizim.lineWidth = 1.5;
+        cizim.setLineDash([6, 6]);
+        cizim.beginPath();
+        for (let i = 0; i <= 100; i++) {
+          const t = bilgi.ucusSuresi * i / 100;
+          const x = bilgi.hizX * t;
+          const y = bilgi.hizY * t - 0.5 * bilgi.g * t * t;
+          if (i === 0) cizim.moveTo(d.x(x), d.y(y));
+          else cizim.lineTo(d.x(x), d.y(Math.max(0, y)));
+        }
+        cizim.stroke();
+        cizim.restore();
+
+        cizim.fillStyle = "#7A8894";
+        cizim.font = "700 11px system-ui, sans-serif";
+        cizim.textAlign = "right";
+        cizim.textBaseline = "bottom";
+        cizim.fillText("Gerçek cevap", d.x(bilgi.menzil) - 4, d.zemin - 7);
+      }
+
+      function iziCiz(top, d, sira) {
+        if (top.iz.length < 2) return;
+        cizim.strokeStyle = top.renk;
+        cizim.lineWidth = 2;
+        cizim.setLineDash([]);
+        cizim.beginPath();
+        top.iz.forEach((nokta, i) => {
+          if (i === 0) cizim.moveTo(d.x(nokta.x), d.y(nokta.y));
+          else cizim.lineTo(d.x(nokta.x), d.y(nokta.y));
+        });
+        cizim.stroke();
+
+        const etiket = top.iz[Math.min(2 + sira, top.iz.length - 1)];
+        cizim.fillStyle = top.renk;
+        cizim.font = "750 11px system-ui, sans-serif";
+        cizim.textAlign = "left";
+        cizim.textBaseline = "bottom";
+        cizim.fillText(`${top.fps} FPS`, d.x(etiket.x) + 4, d.y(etiket.y) - 5);
+      }
+
+      function topuCiz(top, d) {
+        let x = top.x;
+        let y = top.y;
+        if (!top.indi && top.iz.length > 1) {
+          // Fizik örnekleri arasındaki görsel konumu enterpole ederek hareketi akıcı gösteririz.
+          const oran = Math.max(0, Math.min(1, top.biriken / top.dt));
+          x = top.oncekiX + (top.x - top.oncekiX) * oran;
+          y = top.oncekiY + (top.y - top.oncekiY) * oran;
+        }
+        cizim.fillStyle = top.renk;
+        cizim.beginPath();
+        cizim.arc(d.x(x), d.y(Math.max(0, y)), 7, 0, Math.PI * 2);
+        cizim.fill();
+      }
+
+      function inisIsaretiCiz(top, d, sira) {
+        if (!top.indi) return;
+        const x = d.x(top.menzil);
+        const sapma = top.menzil - bilgi.menzil;
+        const yuzde = sapma / bilgi.menzil * 100;
+        cizim.strokeStyle = top.renk;
+        cizim.lineWidth = 2;
+        cizim.beginPath();
+        cizim.moveTo(x, d.zemin - 8);
+        cizim.lineTo(x, d.zemin + 8);
+        cizim.stroke();
+        cizim.fillStyle = top.renk;
+        cizim.font = "700 10px system-ui, sans-serif";
+        cizim.textAlign = "right";
+        cizim.textBaseline = "bottom";
+        cizim.fillText(`${sayi(top.menzil)} m · ${sayi(sapma)} m (${sayi(yuzde, 1)}%)`, x - 4, d.zemin - 10 - sira * 14);
+      }
+
+      function sahneyiCiz() {
+        if (!bilgi) return;
+        const { genislik, yukseklik } = boyutlandir();
+        const d = donusum(genislik, yukseklik);
+        cizim.clearRect(0, 0, genislik, yukseklik);
+        eksenleriCiz(d, genislik);
+        referansiCiz(d);
+        toplar.forEach((top, i) => iziCiz(top, d, i));
+        toplar.forEach((top, i) => inisIsaretiCiz(top, d, i));
+        toplar.forEach(top => topuCiz(top, d));
+      }
+
+      function arayuzuGuncelle() {
+        KOK.querySelector("#atisHizDegeri").value = `${sayi(Number(hizGirdisi.value), 1)} m/s`;
+        KOK.querySelector("#atisAciDegeri").value = `${aciGirdisi.value}°`;
+        KOK.querySelector("#atisGDegeri").value = `${sayi(Number(gGirdisi.value))} m/s²`;
+        KOK.querySelector("#atisYavasDegeri").value = `${sayi(Number(yavasGirdisi.value), 1)}×`;
+        toplar.forEach((top, i) => {
+          basliklar[i].textContent = `${top.fps} FPS`;
+          if (!top.indi) {
+            sonuclar[i].textContent = "Menzil — · Sapma —";
+            return;
+          }
+          const sapma = top.menzil - bilgi.menzil;
+          const yuzde = sapma / bilgi.menzil * 100;
+          sonuclar[i].textContent = `${sayi(top.menzil)} m · ${sayi(sapma)} m (${sayi(yuzde, 1)}%)`;
+        });
+        KOK.querySelector("#atisGercekCevap").textContent =
+          `Menzil ${sayi(bilgi.menzil)} m · Uçuş süresi ${sayi(bilgi.ucusSuresi)} s · Başlangıç hızı X/Y: ${sayi(bilgi.hizX)} / ${sayi(bilgi.hizY)} m/s`;
+      }
+
+      function animasyon(gercekZaman) {
+        // Arka plandan dönüşte büyük bir hesap kuyruğu oluşmasını engelleriz.
+        const gercekDt = Math.min((gercekZaman - oncekiGercekZaman) / 1000, 0.1);
+        oncekiGercekZaman = gercekZaman;
+        fizigiIlerlet(gercekDt);
+        arayuzuGuncelle();
+        sahneyiCiz();
+        requestAnimationFrame(animasyon);
+      }
+
+      [hizGirdisi, aciGirdisi, gGirdisi].forEach(girdi => girdi.addEventListener("input", yenidenFirlat));
+      yavasGirdisi.addEventListener("input", arayuzuGuncelle);
+      fpsGirdileri.forEach(girdi => girdi.addEventListener("change", yenidenFirlat));
+      KOK.querySelector("#atisYeniden").addEventListener("click", yenidenFirlat);
+      window.addEventListener("resize", sahneyiCiz);
+
+      yenidenFirlat();
+      requestAnimationFrame(animasyon);
+    })();
+  </script>
+</body>
+</html>
